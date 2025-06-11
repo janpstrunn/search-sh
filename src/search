@@ -6,6 +6,24 @@ if ! command -v lynx &>/dev/null; then
   echo "This script requires Lynx. Please install it."
 fi
 
+function help() {
+  cat <<EOF
+Leta Searcher
+
+Usage:
+  search FLAG QUERY
+  search -h | search help
+
+Flags:
+  -h               Displays this message and exits
+  -s               Search in the terminal
+EOF
+}
+
+function version() {
+  echo "0.1.0"
+}
+
 function get_urls() {
   if command -v lynx &>/dev/null; then
     lynx -dump "https://leta.mullvad.net/search?q=$query&engine=brave" | rg --no-line-number '  https://' | tr -d " "
