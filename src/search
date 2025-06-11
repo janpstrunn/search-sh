@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 
-mode=$1
-shift
-args=$*
 restart="Alt-r"
 
-if ! command -v lynx; then
+if ! command -v lynx &>/dev/null; then
   echo "This script requires Lynx. Please install it."
 fi
 
 function get_urls() {
-  if command -v lynx; then
+  if command -v lynx &>/dev/null; then
     lynx -dump "https://leta.mullvad.net/search?q=$query&engine=brave" | rg --no-line-number '  https://' | tr -d " "
     return 0
-  elif command -v htmlq; then
+  elif command -v htmlq &>/dev/null; then
     curl -s "https://leta.mullvad.net/search?q=tor+browser&engine=brave" |
       htmlq -a href a |
       rg '^https?://' |
       tr -d " "
     return 0
-  elif command -v pup; then
+  elif command -v pup &>/dev/null; then
     curl -s "https://leta.mullvad.net/search?q=tor+browser&engine=brave" |
       pup 'a attr{href}' |
       rg '^https?://' |
@@ -62,7 +59,7 @@ function main() {
   esac
   if [ "$mode" == "sh" ]; then
     [[ -z $select ]] && exit 1
-    if command -v lynx; then
+    if command -v lynx &>/dev/null; then
       lynx -cookies $select
     else
       xdg-open "$select" >/dev/null
@@ -71,5 +68,25 @@ function main() {
     xdg-open "$select" >/dev/null
   fi
 }
+
+while getopts ":hs" opt; do
+  case "$opt" in
+  h)
+    help
+    exit 0
+    ;;
+  s)
+    mode="sh"
+    ;;
+  ?)
+    echo "Error: Invalid option '-$OPTARG'" >&2
+    exit 1
+    ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+args=$*
 
 main
