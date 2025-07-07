@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-restart="Alt-r"
-
-if ! command -v lynx &>/dev/null; then
-  echo "This script requires Lynx. Please install it."
-fi
+declare -i page=1
 
 function help() {
   cat <<EOF
@@ -16,69 +12,75 @@ Usage:
 
 Flags:
   -h               Displays this message and exits
-  -s               Search in the terminal
+  -s SEARCH        Search in the terminal
 EOF
 }
 
 function version() {
-  echo "0.1.0"
-}
-
-function get_urls() {
-  if command -v lynx &>/dev/null; then
-    lynx -dump "https://leta.mullvad.net/search?q=$query&engine=brave" | rg --no-line-number '  https://' | tr -d " "
-    return 0
-  elif command -v htmlq &>/dev/null; then
-    curl -s "https://leta.mullvad.net/search?q=tor+browser&engine=brave" |
-      htmlq -a href a |
-      rg '^https?://' |
-      tr -d " "
-    return 0
-  elif command -v pup &>/dev/null; then
-    curl -s "https://leta.mullvad.net/search?q=tor+browser&engine=brave" |
-      pup 'a attr{href}' |
-      rg '^https?://' |
-      tr -d " "
-    return 0
-  else
-    echo "You must have one these installed to properly run search:"
-    echo -e "Lynx\nCurl + HTMLQ\nCurl + PUP"
-    exit 1
-  fi
+  echo "0.2.0"
 }
 
 function _rofi() {
-  rofi -dmenu -i -no-levenshtein-sort -width 1000 -kb-custom-1 "${restart}" "$@"
-}
+  local div_color="#334433"
+  local HELP
+  local help_color="#7c5cff"
+  local label="#f067fc"
+  local next="Ctrl+1"
+  local prev="Ctrl+2"
+  local restart="Alt-r"
+  HELP="<span color='${label}'>Actions: </span> <span color='${help_color}'>${next}</span>: Next Page <span color='${div_color}'>|</span> <span color='${help_color}'>${prev}</span>: Previous Page"
+  rofi -dmenu -i -no-levenshtein-sort -width 1000 -mesg "${HELP}" -kb-custom-1 "${restart}" -kb-custom-2 "${next}" -kb-custom-3 "${prev}" "$@"
 
-function get_input() {
-  if [ "$mode" == "sh" ]; then
-    search=$args
-    echo "$search"
-  else
-    search=$(echo "" | _rofi -p "> " -mesg "Enter your Search: ")
-  fi
-  [[ -z $search ]] && exit 1
-  query=$(echo "$search" | sed 's/ /+/')
-}
-
-function main() {
-  get_input
-  if [ "$mode" == "sh" ]; then
-    select=$(get_urls | fzf)
-  else
-    select=$(get_urls | _rofi -p "󰖟 ")
-  fi
   val=$?
   case "$val" in
   10)
     main
     ;;
+  11)
+    page+=1
+    main
+    ;;
+  12)
+    page+=-1
+    if [ "$page" -lt 1 ]; then
+      page=1
+    fi
+    main
+    ;;
   esac
+}
+
+function _fzf() {
+  local HEADER NEXT_PAGE PREV_PAGE
+  export fzf_page=1
+  HEADER=" A-n: Next Page / A-p: Previous Page"
+  NEXT_PAGE="alt-n:reload(fzf_page=\$((fzf_page + 1)); python leta-searcher.py $search --page \$fzf_page)"
+  PREV_PAGE="alt-p:reload(fzf_page=\$((fzf_page - 1)); [ \$fzf_page -lt 1 ] && fzf_page=1; python leta-searcher.py $search --page \$fzf_page)"
+
+  fzf --tmux 88% \
+    --bind "$NEXT_PAGE" \
+    --bind "$PREV_PAGE" \
+    --header "$HEADER" \
+    --preview-window up:67%
+}
+
+function get_input() {
+  if [ -z "$mode" ]; then
+    search=$(echo "" | _rofi -p "> " -mesg "Enter your Search: " | sed 's/ /+/')
+  fi
+  [[ -z $search ]] && exit 1
+}
+
+function main() {
+  if [ "$mode" == "sh" ]; then
+    select=$(python leta-searcher.py "$search" | _fzf | awk -F ". " '{print $2}')
+  else
+    select=$(python leta-searcher.py "$search" --page "$page" | _rofi -p "󰖟 " | awk -F ". " '{print $2}')
+  fi
   if [ "$mode" == "sh" ]; then
     [[ -z $select ]] && exit 1
     if command -v lynx &>/dev/null; then
-      lynx -cookies $select
+      lynx -cookies "$select"
     else
       xdg-open "$select" >/dev/null
     fi
@@ -105,6 +107,7 @@ done
 
 shift $((OPTIND - 1))
 
-args=$*
+search=${*// /+/}
+get_input
 
 main
