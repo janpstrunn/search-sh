@@ -73,9 +73,9 @@ function get_input() {
 
 function main() {
   if [ "$mode" == "sh" ]; then
-    select=$(python leta-searcher.py "$search" | _fzf | awk -F ". " '{print $2}')
+    select=$(python "$(dirname "$0")/leta-searcher.py" "$search" | _fzf | awk -F ". " '{print $2}')
   else
-    select=$(python leta-searcher.py "$search" --page "$page" | _rofi -p "󰖟 " | awk -F ". " '{print $2}')
+    select=$(python "$(dirname "$0")/leta-searcher.py" "$search" --page "$page" | _rofi -p "󰖟 " | awk -F ". " '{print $2}')
   fi
   if [ "$mode" == "sh" ]; then
     [[ -z $select ]] && exit 1
